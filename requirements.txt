@@ -1,0 +1,34 @@
+# Django et extensions
+Django==5.0.2
+djangorestframework==3.14.0
+djangorestframework-simplejwt==5.3.1
+django-cors-headers==4.3.1
+django-filter==23.5
+django-redis==5.4.0
+python-dotenv==1.0.1
+Pillow==10.2.0  # Pour la gestion des images
+
+# Base de données
+psycopg2-binary==2.9.9  # Pour PostgreSQL
+
+# Cache et tâches asynchrones
+redis==5.0.1
+celery==5.3.6
+
+# Sécurité
+django-storages==1.14.2  # Pour le stockage des fichiers
+django-environ==0.11.2
+
+# Documentation
+drf-yasg==1.21.7  # Pour la documentation Swagger/OpenAPI
+
+# Tests
+pytest==8.0.0
+pytest-django==4.7.0
+pytest-cov==4.1.0
+factory-boy==3.3.0
+
+# Développement
+black==24.1.1  # Formatage du code
+flake8==7.0.0  # Linting
+isort==5.13.2  # Organisation des imports 

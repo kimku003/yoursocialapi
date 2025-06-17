@@ -1,0 +1,428 @@
+from typing import List, Optional
+from ninja import Router, Schema, File
+from ninja.files import UploadedFile
+from django.contrib.auth import get_user_model, authenticate
+from django.shortcuts import get_object_or_404
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
+from ninja.security import HttpBearer
+from datetime import datetime, timedelta
+import jwt
+from django.conf import settings
+from django.db import models
+from django.db.models import Q
+from django.utils import timezone
+
+from .models import User, UserSettings
+from social.models import Post, Comment, Like
+
+# Création du routeur avec un préfixe unique
+# router = Router(prefix="users")
+router = Router()
+User = get_user_model()
+
+# Schémas de validation
+class UserCreateSchema(Schema):
+    email: str
+    username: str
+    password: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+
+class UserUpdateSchema(Schema):
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    bio: Optional[str] = None
+    location: Optional[str] = None
+    website: Optional[str] = None
+    is_private: Optional[bool] = None
+
+class UserResponseSchema(Schema):
+    id: int
+    email: str
+    username: str
+    first_name: Optional[str]
+    last_name: Optional[str]
+    bio: Optional[str]
+    avatar: Optional[str]
+    banner: Optional[str]
+    location: Optional[str]
+    website: Optional[str]
+    is_private: bool
+    followers_count: int
+    following_count: int
+    posts_count: int
+    created_at: datetime
+
+class TokenSchema(Schema):
+    access_token: str
+    refresh_token: str
+
+class AuthBearer(HttpBearer):
+    def authenticate(self, request, token):
+        try:
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+            user = User.objects.get(id=payload['user_id'])
+            return user
+        except:
+            return None
+
+# Schémas pour les posts et commentaires
+class PostCreateSchema(Schema):
+    content: str
+    media: Optional[UploadedFile] = None
+    media_type: Optional[str] = None
+    hashtags: Optional[List[str]] = None
+    mentions: Optional[List[int]] = None
+    location: Optional[str] = None
+    is_private: Optional[bool] = False
+
+class PostResponseSchema(Schema):
+    id: int
+    author: UserResponseSchema
+    content: str
+    media: Optional[str]
+    media_type: Optional[str]
+    hashtags: Optional[List[str]]
+    location: Optional[str]
+    is_private: bool
+    likes_count: int
+    comments_count: int
+    created_at: datetime
+    updated_at: datetime
+
+class CommentCreateSchema(Schema):
+    content: str
+    parent_id: Optional[int] = None
+
+class CommentResponseSchema(Schema):
+    id: int
+    post_id: int
+    author: UserResponseSchema
+    content: str
+    parent_id: Optional[int]
+    likes_count: int
+    created_at: datetime
+    updated_at: datetime
+
+# Routes d'authentification
+@router.post("/register", response=TokenSchema)
+def register(request, payload: UserCreateSchema):
+    try:
+        # Validation du mot de passe
+        validate_password(payload.password)
+        
+        # Création de l'utilisateur
+        user = User.objects.create_user(
+            email=payload.email,
+            username=payload.username,
+            password=payload.password,
+            first_name=payload.first_name or '',
+            last_name=payload.last_name or ''
+        )
+        
+        # Création des paramètres utilisateur par défaut
+        UserSettings.objects.create(user=user)
+        
+        # Génération des tokens
+        access_token = generate_access_token(user)
+        refresh_token = generate_refresh_token(user)
+        
+        return {"access_token": access_token, "refresh_token": refresh_token}
+    except ValidationError as e:
+        return {"error": str(e)}
+    except Exception as e:
+        return {"error": "Erreur lors de la création du compte"}
+
+@router.post("/login", response=TokenSchema)
+def login(request, email: str, password: str):
+    user = authenticate(email=email, password=password)
+    if user:
+        access_token = generate_access_token(user)
+        refresh_token = generate_refresh_token(user)
+        return {"access_token": access_token, "refresh_token": refresh_token}
+    return {"error": "Identifiants invalides"}
+
+@router.post("/refresh", response=TokenSchema)
+def refresh_token(request, refresh_token: str):
+    try:
+        payload = jwt.decode(refresh_token, settings.SECRET_KEY, algorithms=['HS256'])
+        user = User.objects.get(id=payload['user_id'])
+        access_token = generate_access_token(user)
+        new_refresh_token = generate_refresh_token(user)
+        return {"access_token": access_token, "refresh_token": new_refresh_token}
+    except:
+        return {"error": "Token invalide"}
+
+# Routes de gestion du profil
+@router.get("/me", response=UserResponseSchema, auth=AuthBearer())
+def get_me(request):
+    return request.user
+
+@router.put("/me", response=UserResponseSchema, auth=AuthBearer())
+def update_me(request, payload: UserUpdateSchema):
+    user = request.user
+    for field, value in payload.dict(exclude_unset=True).items():
+        setattr(user, field, value)
+    user.save()
+    return user
+
+@router.post("/me/avatar", response=UserResponseSchema, auth=AuthBearer())
+def upload_avatar(request, file: UploadedFile = File(...)):
+    user = request.user
+    user.avatar.save(file.name, file)
+    user.save()
+    return user
+
+@router.post("/me/banner", response=UserResponseSchema, auth=AuthBearer())
+def upload_banner(request, file: UploadedFile = File(...)):
+    user = request.user
+    user.banner.save(file.name, file)
+    user.save()
+    return user
+
+@router.get("/users/{user_id}", response=UserResponseSchema, auth=AuthBearer())
+def get_user(request, user_id: int):
+    return get_object_or_404(User, id=user_id)
+
+# Routes pour les relations entre utilisateurs
+@router.post("/users/{user_id}/follow", auth=AuthBearer())
+def follow_user(request, user_id: int):
+    if user_id == request.user.id:
+        return {"error": "Vous ne pouvez pas vous suivre vous-même"}
+    
+    user_to_follow = get_object_or_404(User, id=user_id)
+    
+    if request.user in user_to_follow.followers.all():
+        # Se désabonner
+        request.user.following.remove(user_to_follow)
+        return {"action": "unfollowed", "message": f"Vous ne suivez plus {user_to_follow.username}"}
+    else:
+        # S'abonner
+        request.user.following.add(user_to_follow)
+        return {"action": "followed", "message": f"Vous suivez maintenant {user_to_follow.username}"}
+
+@router.get("/users/{user_id}/followers", response=List[UserResponseSchema], auth=AuthBearer())
+def list_followers(request, user_id: int, page: int = 1, limit: int = 20):
+    user = get_object_or_404(User, id=user_id)
+    start = (page - 1) * limit
+    end = start + limit
+    
+    followers = user.followers.all()[start:end]
+    return followers
+
+@router.get("/users/{user_id}/following", response=List[UserResponseSchema], auth=AuthBearer())
+def list_following(request, user_id: int, page: int = 1, limit: int = 20):
+    user = get_object_or_404(User, id=user_id)
+    start = (page - 1) * limit
+    end = start + limit
+    
+    following = user.following.all()[start:end]
+    return following
+
+# Routes pour la recherche d'utilisateurs
+@router.get("/users/search", response=List[UserResponseSchema], auth=AuthBearer())
+def search_users(request, query: str, page: int = 1, limit: int = 20):
+    start = (page - 1) * limit
+    end = start + limit
+    
+    users = User.objects.filter(
+        Q(username__icontains=query) |
+        Q(first_name__icontains=query) |
+        Q(last_name__icontains=query) |
+        Q(bio__icontains=query)
+    ).exclude(id=request.user.id)[start:end]
+    
+    return users
+
+# Routes pour les suggestions d'utilisateurs
+@router.get("/users/suggestions", response=List[UserResponseSchema], auth=AuthBearer())
+def get_user_suggestions(request, limit: int = 10):
+    # Utilisateurs que l'utilisateur ne suit pas encore
+    following_ids = list(request.user.following.values_list('id', flat=True))
+    following_ids.append(request.user.id)
+    
+    suggestions = User.objects.exclude(
+        id__in=following_ids
+    ).order_by('-followers_count', '-date_joined')[:limit]
+    
+    return suggestions
+
+# Routes pour les paramètres utilisateur
+@router.get("/me/settings", auth=AuthBearer())
+def get_user_settings(request):
+    settings, _ = UserSettings.objects.get_or_create(user=request.user)
+    return {
+        'email_notifications': settings.email_notifications,
+        'push_notifications': settings.push_notifications,
+        'language': settings.language,
+        'theme': settings.theme
+    }
+
+@router.put("/me/settings", auth=AuthBearer())
+def update_user_settings(request, payload: dict):
+    settings, _ = UserSettings.objects.get_or_create(user=request.user)
+    
+    for field, value in payload.items():
+        if hasattr(settings, field):
+            setattr(settings, field, value)
+    
+    settings.save()
+    return {
+        'email_notifications': settings.email_notifications,
+        'push_notifications': settings.push_notifications,
+        'language': settings.language,
+        'theme': settings.theme
+    }
+
+# Routes pour les statistiques utilisateur
+@router.get("/me/statistics", auth=AuthBearer())
+def get_user_statistics(request):
+    user = request.user
+    
+    # Statistiques de base
+    stats = {
+        'posts_count': user.posts.count(),
+        'followers_count': user.followers.count(),
+        'following_count': user.following.count(),
+        'likes_received': Like.objects.filter(
+            models.Q(post__author=user) | models.Q(comment__author=user)
+        ).count(),
+        'comments_received': Comment.objects.filter(post__author=user).count(),
+        'stories_count': user.stories.count(),
+        'account_age_days': (timezone.now() - user.date_joined).days
+    }
+    
+    # Statistiques des dernières 24h
+    yesterday = timezone.now() - timedelta(days=1)
+    stats.update({
+        'posts_24h': user.posts.filter(created_at__gte=yesterday).count(),
+        'stories_24h': user.stories.filter(created_at__gte=yesterday).count(),
+        'new_followers_24h': user.followers.filter(date_joined__gte=yesterday).count()
+    })
+    
+    return stats
+
+# Routes pour la gestion des posts
+@router.post("/posts", response=PostResponseSchema, auth=AuthBearer())
+def create_post(request, payload: PostCreateSchema):
+    post_data = payload.dict(exclude_unset=True)
+    media = post_data.pop('media', None)
+    mentions = post_data.pop('mentions', [])
+    
+    post = Post.objects.create(
+        author=request.user,
+        **post_data
+    )
+    
+    if media:
+        post.media.save(media.name, media)
+    
+    if mentions:
+        post.mentions.set(User.objects.filter(id__in=mentions))
+    
+    return post
+
+@router.get("/posts", response=List[PostResponseSchema], auth=AuthBearer())
+def list_posts(request, page: int = 1, limit: int = 20):
+    start = (page - 1) * limit
+    end = start + limit
+    
+    posts = Post.objects.filter(
+        models.Q(author=request.user) |
+        models.Q(author__in=request.user.following.all()) |
+        models.Q(is_private=False)
+    ).select_related('author').order_by('-created_at')[start:end]
+    
+    return posts
+
+@router.get("/posts/{post_id}", response=PostResponseSchema, auth=AuthBearer())
+def get_post(request, post_id: int):
+    return get_object_or_404(Post, id=post_id)
+
+@router.delete("/posts/{post_id}", auth=AuthBearer())
+def delete_post(request, post_id: int):
+    post = get_object_or_404(Post, id=post_id, author=request.user)
+    post.delete()
+    return {"message": "Post supprimé avec succès"}
+
+# Routes pour les commentaires
+@router.post("/posts/{post_id}/comments", response=CommentResponseSchema, auth=AuthBearer())
+def create_comment(request, post_id: int, payload: CommentCreateSchema):
+    post = get_object_or_404(Post, id=post_id)
+    
+    comment_data = payload.dict(exclude_unset=True)
+    parent_id = comment_data.pop('parent_id', None)
+    
+    if parent_id:
+        parent = get_object_or_404(Comment, id=parent_id, post=post)
+        comment_data['parent'] = parent
+    
+    comment = Comment.objects.create(
+        post=post,
+        author=request.user,
+        **comment_data
+    )
+    
+    return comment
+
+@router.get("/posts/{post_id}/comments", response=List[CommentResponseSchema], auth=AuthBearer())
+def list_comments(request, post_id: int, page: int = 1, limit: int = 20):
+    post = get_object_or_404(Post, id=post_id)
+    start = (page - 1) * limit
+    end = start + limit
+    
+    comments = Comment.objects.filter(
+        post=post,
+        parent=None
+    ).select_related('author').order_by('-created_at')[start:end]
+    
+    return comments
+
+# Routes pour les likes
+@router.post("/posts/{post_id}/like", auth=AuthBearer())
+def like_post(request, post_id: int):
+    post = get_object_or_404(Post, id=post_id)
+    
+    like, created = Like.objects.get_or_create(
+        user=request.user,
+        post=post
+    )
+    
+    if not created:
+        like.delete()
+        return {"action": "unliked", "message": "Like supprimé"}
+    
+    return {"action": "liked", "message": "Post liké"}
+
+@router.post("/comments/{comment_id}/like", auth=AuthBearer())
+def like_comment(request, comment_id: int):
+    comment = get_object_or_404(Comment, id=comment_id)
+    
+    like, created = Like.objects.get_or_create(
+        user=request.user,
+        comment=comment
+    )
+    
+    if not created:
+        like.delete()
+        return {"action": "unliked", "message": "Like supprimé"}
+    
+    return {"action": "liked", "message": "Commentaire liké"}
+
+# Fonctions utilitaires pour les tokens JWT
+def generate_access_token(user):
+    payload = {
+        'user_id': user.id,
+        'exp': datetime.utcnow() + timedelta(minutes=60),
+        'iat': datetime.utcnow()
+    }
+    return jwt.encode(payload, settings.SECRET_KEY, algorithm='HS256')
+
+def generate_refresh_token(user):
+    payload = {
+        'user_id': user.id,
+        'exp': datetime.utcnow() + timedelta(days=7),
+        'iat': datetime.utcnow()
+    }
+    return jwt.encode(payload, settings.SECRET_KEY, algorithm='HS256') 

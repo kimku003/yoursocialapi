@@ -1,0 +1,109 @@
+# Environnements virtuels
+venv/
+.env
+.env.*
+*.env
+
+# Fichiers Python compilés
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Fichiers temporaires/backup
+*.swp
+*.swo
+*.bak
+*.tmp
+
+# Fichiers de logs
+*.log
+debug.log
+
+# Fichiers de base de données
+*.sqlite3
+*.db
+
+# Fichiers de configuration secrets
+*.secret
+*.key
+*.pem
+*.crt
+
+# Dossiers de médias et uploads
+media/
+media/*
+staticfiles/
+static/
+
+# Fichiers générés par Django
+*.pot
+*.pyc
+*.pyo
+
+# Migrations
+**/migrations/*.py
+!**/migrations/__init__.py
+
+# Fichiers de test et de couverture
+.coverage
+htmlcov/
+.tox/
+.nox/
+.cache/
+pytest_cache/
+
+# Fichiers de configuration d'IDE
+.idea/
+.vscode/
+*.code-workspace
+
+# Fichiers de build
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Fichiers de documentation générés
+*.pdf
+*.docx
+*.md~
+
+# Fichiers de Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Fichiers de Docker
+*.pid
+
+# Fichiers de configuration de production
+settings_local.py
+
+# Fichiers de configuration de la base de données
+*.dump
+
+# Fichiers de configuration de Stripe, Firebase, etc.
+stripe_*.json
+firebase_*.json
+
+# Fichiers de configuration de coverage
+.coverage
+coverage.xml
+
+# Fichiers de configuration de l'analyse
+*.stats
+
+# Fichiers de configuration de Sentry
+.sentryclirc
+
+# Fichiers de configuration de GitHub
+.github/
+
+# Fichiers de configuration de Celery
+celery_config.py
+
+# Fichiers de configuration de tests
+pytest.ini
+
+# Fichiers de configuration de l'API
+API_DOCUMENTATION.md
+README_API.md
