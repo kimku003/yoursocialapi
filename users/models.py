@@ -17,6 +17,15 @@ class User(AbstractUser):
     created_at = models.DateTimeField(_('date de création'), auto_now_add=True)
     updated_at = models.DateTimeField(_('date de modification'), auto_now=True)
 
+    # Relations many-to-many pour les followers/following
+    following = models.ManyToManyField(
+        'self',
+        symmetrical=False,
+        related_name='followers',
+        verbose_name=_('abonnements'),
+        blank=True
+    )
+
     # Champs pour les statistiques
     followers_count = models.PositiveIntegerField(_('nombre d\'abonnés'), default=0)
     following_count = models.PositiveIntegerField(_('nombre d\'abonnements'), default=0)
