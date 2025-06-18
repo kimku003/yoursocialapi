@@ -62,13 +62,43 @@ class AuthBearer(HttpBearer):
     def authenticate(self, request, token):
         try:
             payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
-            user = User.objects.get(id=payload['user_id'])
+            user_id = payload.get('user_id')
+            if not user_id:
+                print(f"DEBUG: Token sans user_id: {payload}")
+                return None
+            
+            user = User.objects.get(id=user_id)
+            print(f"DEBUG: Utilisateur authentifié: {user.username} (ID: {user.id})")
             return user
-        except:
+        except jwt.ExpiredSignatureError:
+            print("DEBUG: Token expiré")
+            return None
+        except jwt.InvalidTokenError as e:
+            print(f"DEBUG: Token invalide: {e}")
+            return None
+        except User.DoesNotExist:
+            print(f"DEBUG: Utilisateur avec ID {payload.get('user_id')} n'existe pas")
+            return None
+        except Exception as e:
+            print(f"DEBUG: Erreur d'authentification: {e}")
             return None
 
 # Schémas pour les posts et commentaires
 class PostCreateSchema(Schema):
+    content: str
+    author_id: Optional[int] = None  # ID de l'utilisateur qui sera l'auteur du post
+    media: Optional[UploadedFile] = None
+    media_type: Optional[str] = None
+    hashtags: Optional[List[str]] = None
+    mentions: Optional[List[int]] = None
+    location: Optional[str] = None
+    is_private: Optional[bool] = False
+
+class PostCreateForUserSchema(Schema):
+    """
+    Schéma simplifié pour créer un post au nom d'un utilisateur spécifique
+    (sans le paramètre author_id car il est dans l'URL)
+    """
     content: str
     media: Optional[UploadedFile] = None
     media_type: Optional[str] = None
@@ -306,14 +336,38 @@ def get_user_statistics(request):
 # Routes pour la gestion des posts
 @router.post("/posts", response=PostResponseSchema, auth=AuthBearer())
 def create_post(request, payload: PostCreateSchema):
+    print(f"DEBUG: Création de post - Utilisateur authentifié: {request.user.username} (ID: {request.user.id})")
+    print(f"DEBUG: Contenu du post: {payload.content}")
+    print(f"DEBUG: Author ID demandé: {payload.author_id}")
+    
     post_data = payload.dict(exclude_unset=True)
+    author_id = post_data.pop('author_id', None)
     media = post_data.pop('media', None)
     mentions = post_data.pop('mentions', [])
     
+    # Déterminer l'auteur du post
+    if author_id:
+        # Vérifier que l'utilisateur connecté a les permissions pour créer un post au nom d'un autre utilisateur
+        # Seuls les superusers ou les utilisateurs avec des permissions spéciales peuvent le faire
+        if not request.user.is_superuser:
+            return {"error": "Vous n'avez pas les permissions pour créer un post au nom d'un autre utilisateur"}
+        
+        try:
+            author = User.objects.get(id=author_id)
+            print(f"DEBUG: Utilisation de l'auteur spécifié: {author.username} (ID: {author.id})")
+        except User.DoesNotExist:
+            return {"error": f"Utilisateur avec l'ID {author_id} n'existe pas"}
+    else:
+        # Utiliser l'utilisateur connecté comme auteur par défaut
+        author = request.user
+        print(f"DEBUG: Utilisation de l'utilisateur connecté comme auteur: {author.username} (ID: {author.id})")
+    
     post = Post.objects.create(
-        author=request.user,
+        author=author,
         **post_data
     )
+    
+    print(f"DEBUG: Post créé avec succès - ID: {post.id}, Auteur: {post.author.username} (ID: {post.author.id})")
     
     if media:
         post.media.save(media.name, media)
@@ -322,6 +376,63 @@ def create_post(request, payload: PostCreateSchema):
         post.mentions.set(User.objects.filter(id__in=mentions))
     
     return post
+
+@router.post("/users/{user_id}/posts", response=PostResponseSchema, auth=AuthBearer())
+def create_post_for_user(request, user_id: int, payload: PostCreateForUserSchema):
+    """
+    Créer un post au nom d'un utilisateur spécifique (nécessite des permissions admin)
+    """
+    print(f"DEBUG: Création de post pour utilisateur {user_id} - Utilisateur authentifié: {request.user.username} (ID: {request.user.id})")
+    
+    # Vérifier les permissions
+    if not request.user.is_superuser:
+        return {"error": "Vous n'avez pas les permissions pour créer un post au nom d'un autre utilisateur"}
+    
+    try:
+        author = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return {"error": f"Utilisateur avec l'ID {user_id} n'existe pas"}
+    
+    post_data = payload.dict(exclude_unset=True)
+    media = post_data.pop('media', None)
+    mentions = post_data.pop('mentions', [])
+    
+    post = Post.objects.create(
+        author=author,
+        **post_data
+    )
+    
+    print(f"DEBUG: Post créé avec succès pour {author.username} - ID: {post.id}")
+    
+    if media:
+        post.media.save(media.name, media)
+    
+    if mentions:
+        post.mentions.set(User.objects.filter(id__in=mentions))
+    
+    return post
+
+@router.get("/users/{user_id}/posts", response=List[PostResponseSchema], auth=AuthBearer())
+def list_user_posts(request, user_id: int, page: int = 1, limit: int = 20):
+    """
+    Lister les posts d'un utilisateur spécifique
+    """
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return {"error": f"Utilisateur avec l'ID {user_id} n'existe pas"}
+    
+    start = (page - 1) * limit
+    end = start + limit
+    
+    # Vérifier les permissions de visibilité
+    if user.is_private and request.user != user and not request.user.is_superuser:
+        # Vérifier si l'utilisateur connecté suit l'utilisateur privé
+        if not request.user.is_following(user):
+            return {"error": "Vous n'avez pas accès aux posts de cet utilisateur privé"}
+    
+    posts = Post.objects.filter(author=user).select_related('author').order_by('-created_at')[start:end]
+    return posts
 
 @router.get("/posts", response=List[PostResponseSchema], auth=AuthBearer())
 def list_posts(request, page: int = 1, limit: int = 20):
