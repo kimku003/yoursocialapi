@@ -1,12 +1,12 @@
 # Django et extensions
 Django==5.0.2
-djangorestframework==3.14.0
-djangorestframework-simplejwt==5.3.1
+djangorestframework==3.15.2
+djangorestframework-simplejwt==5.4.0
 django-cors-headers==4.3.1
 django-filter==23.5
 django-redis==5.4.0
 python-dotenv==1.0.1
-Pillow==10.2.0  # Pour la gestion des images
+Pillow==10.3.0  # Pour la gestion des images
 
 # Base de données
 psycopg2-binary==2.9.9  # Pour PostgreSQL
@@ -29,6 +29,6 @@ pytest-cov==4.1.0
 factory-boy==3.3.0
 
 # Développement
-black==24.1.1  # Formatage du code
+black==24.3.0  # Formatage du code
 flake8==7.0.0  # Linting
 isort==5.13.2  # Organisation des imports 
