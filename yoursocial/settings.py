@@ -15,7 +15,8 @@ import os
 from datetime import timedelta
 from dotenv import load_dotenv
 import sys
-
+import urllib.parse
+from urllib.parse import urlparse
 # Chargement des variables d'environnement
 load_dotenv()
 
@@ -642,6 +643,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
     "https://yoursocial.com",
     "https://www.yoursocial.com",
+    
 ]
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_METHODS = [
@@ -684,20 +686,66 @@ CACHES = {
     }
 }
 
-# Configuration de la base de données
-DATABASES = {
-    'default': {
-        'ENGINE': os.getenv('DB_ENGINE', 'django.db.backends.postgresql'),
-        'NAME': os.getenv('DB_NAME', 'ma_base'),
-        'USER': os.getenv('DB_USER', 'mon_utilisateur'),
-        'PASSWORD': os.getenv('DB_PASSWORD', 'motdepasse123'),
-        'HOST': os.getenv('DB_HOST', 'localhost'),
-        'PORT': os.getenv('DB_PORT', '5432'),
+# Configuration de la base de données locale
+# DATABASES = {
+#     'default': {
+#         'ENGINE': os.getenv('DB_ENGINE', 'django.db.backends.postgresql'),
+#         'NAME': os.getenv('DB_NAME', 'ma_base'),
+#         'USER': os.getenv('DB_USER', 'mon_utilisateur'),
+#         'PASSWORD': os.getenv('DB_PASSWORD', 'motdepasse123'),
+#         'HOST': os.getenv('DB_HOST', 'localhost'),
+#         'PORT': os.getenv('DB_PORT', '5432'),
 
-        'CONN_MAX_AGE': 60,
+#         'CONN_MAX_AGE': 60,
        
+#     }
+# }
+
+# Configuration de la base de données pour le déploiement sur Render
+
+
+# Configuration automatique pour Render (production)
+if 'RENDER' in os.environ:
+    DATABASE_URL = os.getenv('DATABASE_URL')  # Injecté automatiquement par Render
+    db_info = urlparse(DATABASE_URL)
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': db_info.path[1:],
+            'USER': db_info.username,
+            'PASSWORD': db_info.password,
+            'HOST': db_info.hostname,
+            'PORT': db_info.port,
+            'OPTIONS': {'sslmode': 'require'},  # Important pour Render
+        }
     }
-}
+else:
+    # Configuration locale (utilisez python-dotenv)
+    DATABASES = {
+        'default': {
+            'ENGINE': os.getenv('DB_ENGINE', 'django.db.backends.postgresql'),
+            'NAME': os.getenv('DB_NAME', 'ma_base'),
+            'USER': os.getenv('DB_USER', 'mon_utilisateur'),
+            'PASSWORD': os.getenv('DB_PASSWORD', 'motdepasse123'),
+            'HOST': os.getenv('DB_HOST', 'localhost'),
+            'PORT': os.getenv('DB_PORT', '5432'),
+
+            # 'CONN_MAX_AGE': 60,
+        
+        }
+    }
+# db_url = urllib.parse.urlparse(os.getenv('DATABASE_URL'))
+
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': db_url.path[1:],
+#         'USER': db_url.username,
+#         'PASSWORD': db_url.password,
+#         'HOST': db_url.hostname,
+#         'PORT': db_url.port,
+#     }
+# }
 
 # Configuration de la sécurité
 if not DEBUG:
