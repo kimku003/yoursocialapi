@@ -1,13 +1,7 @@
 Excellente question ! Voici une liste complète des améliorations possibles pour votre application YourSocial, organisées par catégories :
 
 ## 🔐 **Sécurité et Authentification**
-
-### 1. **Amélioration de l'authentification**
-- **Authentification à deux facteurs (2FA)** avec TOTP
-- **OAuth2** pour connexion via Google, Facebook, Twitter
-- **Sessions multiples** avec gestion des appareils connectés
-- **Révocation de tokens** avec liste noire
-- **Rate limiting** pour prévenir les attaques par force brute
+python ma    ma
 
 ### 2. **Permissions et Rôles**
 - **Système de rôles** (admin, modérateur, utilisateur, premium)

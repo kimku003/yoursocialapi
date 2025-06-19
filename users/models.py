@@ -35,6 +35,14 @@ class User(AbstractUser):
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username']
 
+    ROLE_CHOICES = [
+        ("ADMIN", "Administrateur"),
+        ("MODERATEUR", "Modérateur"),
+        ("UTILISATEUR", "Utilisateur"),
+        ("PREMIUM", "Premium"),
+    ]
+    role = models.CharField(_('rôle'), max_length=20, choices=ROLE_CHOICES, default="UTILISATEUR")
+
     class Meta:
         verbose_name = _('utilisateur')
         verbose_name_plural = _('utilisateurs')
@@ -99,3 +107,20 @@ class UserSettings(models.Model):
 
     def __str__(self):
         return f"Paramètres de {self.user.username}"
+
+class User2FA(models.Model):
+    """
+    Gestion du 2FA TOTP pour l'utilisateur
+    """
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='twofa')
+    secret = models.CharField(_('clé secrète TOTP'), max_length=32)
+    is_active = models.BooleanField(_('2FA activé'), default=False)
+    created_at = models.DateTimeField(_('date de création'), auto_now_add=True)
+    updated_at = models.DateTimeField(_('date de modification'), auto_now=True)
+
+    class Meta:
+        verbose_name = _('2FA utilisateur')
+        verbose_name_plural = _('2FA utilisateurs')
+
+    def __str__(self):
+        return f"2FA de {self.user.username} (actif: {self.is_active})"

@@ -12,8 +12,14 @@ from django.conf import settings
 from django.db import models
 from django.db.models import Q
 from django.utils import timezone
+import pyotp
+import qrcode
+import io
+import base64
+from django_ratelimit.decorators import ratelimit
+from django.core.cache import cache
 
-from .models import User, UserSettings
+from .models import User, UserSettings, User2FA
 from social.models import Post, Comment, Like
 
 # Création du routeur avec un préfixe unique
@@ -135,6 +141,35 @@ class CommentResponseSchema(Schema):
     created_at: datetime
     updated_at: datetime
 
+class TwoFAActivateResponseSchema(Schema):
+    otpauth_url: str
+    qr_code_base64: str
+
+class TwoFAVerifySchema(Schema):
+    code: str
+
+class TwoFAVerifyResponseSchema(Schema):
+    success: bool
+    message: str
+
+class LoginSchema(Schema):
+    email: str
+    password: str
+    code: Optional[str] = None
+
+class LoginResponseSchema(Schema):
+    access_token: Optional[str] = None
+    refresh_token: Optional[str] = None
+    twofa_required: Optional[bool] = False
+    message: Optional[str] = None
+
+class TwoFADeactivateSchema(Schema):
+    code: str
+
+class TwoFADeactivateResponseSchema(Schema):
+    success: bool
+    message: str
+
 # Routes d'authentification
 @router.post("/register", response=TokenSchema)
 def register(request, payload: UserCreateSchema):
@@ -164,14 +199,27 @@ def register(request, payload: UserCreateSchema):
     except Exception as e:
         return {"error": "Erreur lors de la création du compte"}
 
-@router.post("/login", response=TokenSchema)
-def login(request, email: str, password: str):
-    user = authenticate(email=email, password=password)
+@router.post("/login", response=LoginResponseSchema)
+@ratelimit(key='ip', rate='5/5m', block=True)
+def login(request, payload: LoginSchema):
+    if getattr(request, 'limited', False):
+        return {"message": "Trop de tentatives de connexion. Veuillez réessayer plus tard."}
+    user = authenticate(email=payload.email, password=payload.password)
     if user:
+        try:
+            user_2fa = User2FA.objects.get(user=user)
+        except User2FA.DoesNotExist:
+            user_2fa = None
+        if user_2fa and user_2fa.is_active:
+            if not payload.code:
+                return {"twofa_required": True, "message": "Code 2FA requis."}
+            totp = pyotp.TOTP(user_2fa.secret)
+            if not totp.verify(payload.code):
+                return {"twofa_required": True, "message": "Code 2FA invalide."}
         access_token = generate_access_token(user)
         refresh_token = generate_refresh_token(user)
         return {"access_token": access_token, "refresh_token": refresh_token}
-    return {"error": "Identifiants invalides"}
+    return {"message": "Identifiants invalides."}
 
 @router.post("/refresh", response=TokenSchema)
 def refresh_token(request, refresh_token: str):
@@ -520,6 +568,55 @@ def like_comment(request, comment_id: int):
         return {"action": "unliked", "message": "Like supprimé"}
     
     return {"action": "liked", "message": "Commentaire liké"}
+
+# Routes pour le 2FA
+@router.post("/me/2fa/activate", response=TwoFAActivateResponseSchema, auth=AuthBearer())
+def activate_2fa(request):
+    user = request.user
+    # Générer un secret TOTP
+    secret = pyotp.random_base32()
+    otpauth_url = pyotp.totp.TOTP(secret).provisioning_uri(name=user.email, issuer_name="YourSocial")
+    # Générer le QR code
+    qr = qrcode.make(otpauth_url)
+    buffer = io.BytesIO()
+    qr.save(buffer, format="PNG")
+    qr_code_base64 = base64.b64encode(buffer.getvalue()).decode()
+    # Créer ou mettre à jour User2FA
+    User2FA.objects.update_or_create(user=user, defaults={"secret": secret, "is_active": False})
+    return {"otpauth_url": otpauth_url, "qr_code_base64": qr_code_base64}
+
+@router.post("/me/2fa/verify", response=TwoFAVerifyResponseSchema, auth=AuthBearer())
+def verify_2fa(request, payload: TwoFAVerifySchema):
+    user = request.user
+    try:
+        user_2fa = User2FA.objects.get(user=user)
+    except User2FA.DoesNotExist:
+        return {"success": False, "message": "2FA non initialisé pour cet utilisateur."}
+    totp = pyotp.TOTP(user_2fa.secret)
+    if totp.verify(payload.code):
+        user_2fa.is_active = True
+        user_2fa.save()
+        return {"success": True, "message": "2FA activé avec succès."}
+    else:
+        return {"success": False, "message": "Code TOTP invalide."}
+
+@router.post("/me/2fa/deactivate", response=TwoFADeactivateResponseSchema, auth=AuthBearer())
+def deactivate_2fa(request, payload: TwoFADeactivateSchema):
+    user = request.user
+    try:
+        user_2fa = User2FA.objects.get(user=user)
+    except User2FA.DoesNotExist:
+        return {"success": False, "message": "2FA non activé pour cet utilisateur."}
+    if not user_2fa.is_active:
+        return {"success": False, "message": "2FA déjà désactivé."}
+    totp = pyotp.TOTP(user_2fa.secret)
+    if totp.verify(payload.code):
+        user_2fa.is_active = False
+        user_2fa.secret = ''  # Optionnel : supprimer le secret
+        user_2fa.save()
+        return {"success": True, "message": "2FA désactivé avec succès."}
+    else:
+        return {"success": False, "message": "Code TOTP invalide."}
 
 # Fonctions utilitaires pour les tokens JWT
 def generate_access_token(user):
