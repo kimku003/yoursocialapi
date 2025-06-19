@@ -370,6 +370,15 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
 FILE_UPLOAD_TEMP_DIR = os.path.join(BASE_DIR, 'temp')
 
+# Créez un répertoire temporaire pour Render
+if 'RENDER' in os.environ:
+    BASE_DIR = Path(__file__).resolve().parent.parent
+    TEMP_DIR = BASE_DIR / 'temp'
+    TEMP_DIR.mkdir(exist_ok=True)
+    FILE_UPLOAD_TEMP_DIR = TEMP_DIR
+    FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
+
+
 # Configuration des types de fichiers autorisés
 ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
 ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/ogg']
