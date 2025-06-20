@@ -33,7 +33,7 @@ debug.log
 media/
 media/*
 staticfiles/
-static/
+# static/
 
 # Fichiers générés par Django
 *.pot
