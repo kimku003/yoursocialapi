@@ -1,19 +1,21 @@
-from django.contrib.auth import get_user_model
 import os
+import django
+
+# Configure Django avant d'importer les modèles
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'yoursocial.settings')
+django.setup()
+
+from django.contrib.auth import get_user_model
 
 User = get_user_model()
 
-admin_user = os.getenv('ADMIN_USER', '')
-admin_email = os.getenv('ADMIN_EMAIL', '')
-admin_password = os.getenv('ADMIN_PASSWORD', '')
-
-if admin_user and admin_email and admin_password:
-    if not User.objects.filter(username=admin_user).exists():
-        User.objects.create_superuser(
-            admin_user,
-            admin_email,
-            admin_password
-        )
-    print("Superuser créé avec succès !")
+admin_user = os.getenv('ADMIN_USER', 'admin')
+if not User.objects.filter(username=admin_user).exists():
+    User.objects.create_superuser(
+        admin_user,
+        os.getenv('ADMIN_EMAIL', 'admin@example.com'),
+        os.getenv('ADMIN_PASSWORD', 'admin')
+    )
+    print("✅ Superuser créé avec succès")
 else:
-    print("Un superuser existe déjà.")
+    print("⚠️ Superuser existe déjà")
