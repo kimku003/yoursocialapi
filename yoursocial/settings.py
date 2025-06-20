@@ -330,12 +330,7 @@ STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # En production sur Render
-if 'RENDER' in os.environ:
-    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
-    MIDDLEWARE = [  # Ajoutez WHITENOISE en premier
-        'whitenoise.middleware.WhiteNoiseMiddleware',
-        # ... autres middlewares ...
-    ]
+
 # Configuration des sessions
 SESSION_COOKIE_AGE = 60 * 60 * 24 * 7  # 7 jours
 SESSION_COOKIE_SECURE = not DEBUG
