@@ -69,14 +69,15 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django.middleware.security.SecurityMiddleware',          # 1er - Sécurité globale
+    'whitenoise.middleware.WhiteNoiseMiddleware',            # 2e - Fichiers statiques
+    'django.contrib.sessions.middleware.SessionMiddleware',   # 3e - Sessions (DOIT être avant auth)
+    'corsheaders.middleware.CorsMiddleware',                 # 4e - CORS (juste après sessions)
+    'django.middleware.common.CommonMiddleware',             # 5e - URL standardisées
+    'django.middleware.csrf.CsrfViewMiddleware',            # 6e - Protection CSRF
+    'django.contrib.auth.middleware.AuthenticationMiddleware',  # 7e - Authentification
+    'django.contrib.messages.middleware.MessageMiddleware',  # 8e - Messages
+    'django.middleware.clickjacking.XFrameOptionsMiddleware', # 9e - Sécurité X-Frame
 ]
 
 ROOT_URLCONF = 'yoursocial.urls'
