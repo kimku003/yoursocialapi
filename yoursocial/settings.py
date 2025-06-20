@@ -146,11 +146,6 @@ USE_I18N = True
 USE_TZ = True
 
 
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.2/howto/static-files/
-
-STATIC_URL = os.getenv('STATIC_URL', '/static/')
-STATIC_ROOT = os.path.join(BASE_DIR, os.getenv('STATIC_ROOT', 'static'))
 
 # Media files
 MEDIA_URL = os.getenv('MEDIA_URL', '/media/')
@@ -320,6 +315,11 @@ if not DEBUG:
 # Configuration des médias
 MEDIA_URL = os.getenv('MEDIA_URL', '/media/')
 MEDIA_ROOT = os.path.join(BASE_DIR, os.getenv('MEDIA_ROOT', 'media'))
+
+
+# Static files (CSS, JavaScript, Images)
+# https://docs.djangoproject.com/en/5.2/howto/static-files/
+
 
 # Configuration des fichiers statiques
 STATIC_URL = os.getenv('STATIC_URL', '/static/')
