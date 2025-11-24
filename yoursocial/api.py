@@ -170,9 +170,8 @@ from notifications.api import router as notifications_router
 from social.api import router as social_router
 
 # Ajout des routeurs à l'API
-api.add_router("", users_router)
-api.add_router("messaging/", messaging_router)
-api.add_router("notifications/", notifications_router)
-api.add_router("social/", social_router)
-api.add_router("", global_router) 
-
+api.add_router("users/", users_router, tags=["Users"])
+api.add_router("messaging/", messaging_router, tags=["Messaging"])
+api.add_router("notifications/", notifications_router, tags=["Notifications"])
+api.add_router("social/", social_router, tags=["Social"])
+api.add_router("", global_router, tags=["General"])
