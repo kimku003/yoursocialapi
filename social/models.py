@@ -2,7 +2,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.conf import settings
 from django.utils import timezone
-from django.contrib.postgres.fields import ArrayField
+from django.db.models import JSONField
 
 class Post(models.Model):
     """
@@ -27,11 +27,11 @@ class Post(models.Model):
         null=True,
         blank=True
     )
-    hashtags = ArrayField(
-        models.CharField(max_length=50),
+    hashtags = JSONField(
         verbose_name=_('hashtags'),
         blank=True,
-        null=True
+        null=True,
+        default=list # Default to an empty list for JSONField
     )
     mentions = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
@@ -158,11 +158,11 @@ class Story(models.Model):
         verbose_name=_('mentions'),
         blank=True
     )
-    hashtags = ArrayField(
-        models.CharField(max_length=50),
+    hashtags = JSONField(
         verbose_name=_('hashtags'),
         blank=True,
-        null=True
+        null=True,
+        default=list # Default to an empty list for JSONField
     )
     created_at = models.DateTimeField(_('date de création'), auto_now_add=True)
     expires_at = models.DateTimeField(_('date d\'expiration'))

@@ -104,16 +104,27 @@ WSGI_APPLICATION = 'yoursocial.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': os.getenv('DB_ENGINE', 'django.db.backends.postgresql'),
-        'NAME': os.getenv('DB_NAME', 'ma_base'),
-        'USER': os.getenv('DB_USER', 'mon_utilisateur'),
-        'PASSWORD': os.getenv('DB_PASSWORD', 'motdepasse123'),
-        'HOST': os.getenv('DB_HOST', 'localhost'),
-        'PORT': os.getenv('DB_PORT', '5432'),
+if 'DATABASE_URL' in os.environ:
+    DATABASE_URL = os.getenv('DATABASE_URL')
+    db_info = urlparse(DATABASE_URL)
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': db_info.path[1:],
+            'USER': db_info.username,
+            'PASSWORD': db_info.password,
+            'HOST': db_info.hostname,
+            'PORT': db_info.port,
+            'OPTIONS': {'sslmode': 'require'},
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
 # Password validation
@@ -233,24 +244,24 @@ API_DESCRIPTION = "API pour le réseau social YourSocial"
 API_VERSION = "1.0.0"
 API_DOCS_URL = "/api/docs"
 
-# Configuration pour les tests
-if 'test' in sys.argv:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': ':memory:',
-        }
-    }
+# # Configuration pour les tests
+# if 'test' in sys.argv:
+#     DATABASES = {
+#         'default': {
+#             'ENGINE': 'django.db.backends.sqlite3',
+#             'NAME': ':memory:',
+#         }
+#     }
     
-    # Désactiver les migrations pour les tests
-    class DisableMigrations:
-        def __contains__(self, item):
-            return True
+#     # Désactiver les migrations pour les tests
+#     class DisableMigrations:
+#         def __contains__(self, item):
+#             return True
         
-        def __getitem__(self, item):
-            return None
+#         def __getitem__(self, item):
+#             return None
     
-    MIGRATION_MODULES = DisableMigrations()
+#     MIGRATION_MODULES = DisableMigrations()
 
 # Configuration pour le développement
 if DEBUG:
@@ -572,8 +583,8 @@ COVERAGE_REPORT_EXCLUDE_LINES = [
     'raise NotImplementedError',
     'if 0:',
     'if __name__ == .__main__.:',
-    'class .*\\bProtocol\\):',
-    '@(abc\\.)?abstractmethod',
+    'class .*\bProtocol\):',
+    '@(abc\.)?abstractmethod',
 ]
 
 # Configuration des migrations
@@ -701,66 +712,7 @@ CACHES = {
     }
 }
 
-# Configuration de la base de données locale
-# DATABASES = {
-#     'default': {
-#         'ENGINE': os.getenv('DB_ENGINE', 'django.db.backends.postgresql'),
-#         'NAME': os.getenv('DB_NAME', 'ma_base'),
-#         'USER': os.getenv('DB_USER', 'mon_utilisateur'),
-#         'PASSWORD': os.getenv('DB_PASSWORD', 'motdepasse123'),
-#         'HOST': os.getenv('DB_HOST', 'localhost'),
-#         'PORT': os.getenv('DB_PORT', '5432'),
 
-#         'CONN_MAX_AGE': 60,
-       
-#     }
-# }
-
-# Configuration de la base de données pour le déploiement sur Render
-
-
-# Configuration automatique pour Render (production)
-if 'RENDER' in os.environ:
-    DATABASE_URL = os.getenv('DATABASE_URL')  # Injecté automatiquement par Render
-    db_info = urlparse(DATABASE_URL)
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': db_info.path[1:],
-            'USER': db_info.username,
-            'PASSWORD': db_info.password,
-            'HOST': db_info.hostname,
-            'PORT': db_info.port,
-            'OPTIONS': {'sslmode': 'require'},  # Important pour Render
-        }
-    }
-else:
-    # Configuration locale (utilisez python-dotenv)
-    DATABASES = {
-        'default': {
-            'ENGINE': os.getenv('DB_ENGINE', 'django.db.backends.postgresql'),
-            'NAME': os.getenv('DB_NAME', 'ma_base'),
-            'USER': os.getenv('DB_USER', 'mon_utilisateur'),
-            'PASSWORD': os.getenv('DB_PASSWORD', 'motdepasse123'),
-            'HOST': os.getenv('DB_HOST', 'localhost'),
-            'PORT': os.getenv('DB_PORT', '5432'),
-
-            # 'CONN_MAX_AGE': 60,
-        
-        }
-    }
-# db_url = urllib.parse.urlparse(os.getenv('DATABASE_URL'))
-
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.postgresql',
-#         'NAME': db_url.path[1:],
-#         'USER': db_url.username,
-#         'PASSWORD': db_url.password,
-#         'HOST': db_url.hostname,
-#         'PORT': db_url.port,
-#     }
-# }
 
 # Configuration de la sécurité
 if not DEBUG:

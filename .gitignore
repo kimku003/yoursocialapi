@@ -1,4 +1,5 @@
 # Environnements virtuels
+.venv/
 venv/
 .env
 .env.*
@@ -52,6 +53,8 @@ htmlcov/
 .cache/
 pytest_cache/
 
+#logs
+debug.log
 # Fichiers de configuration d'IDE
 .idea/
 .vscode/
@@ -97,7 +100,7 @@ coverage.xml
 
 # Fichiers de configuration de GitHub
 .github/
-
+.idx/
 # Fichiers de configuration de Celery
 celery_config.py
 
