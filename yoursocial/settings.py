@@ -33,7 +33,7 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-change-this-in-production'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,yoursocialapi.onrender.com').split(',')
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,yoursocialapi.onrender.com,9000-firebase-yoursocialapi-1763984561280.cluster-lu4mup47g5gm4rtyvhzpwbfadi.cloudworkstations.dev,9002-firebase-yoursocialapi-1763984561280.cluster-lu4mup47g5gm4rtyvhzpwbfadi.cloudworkstations.dev').split(',')
 
 
 # Application definition
@@ -44,9 +44,10 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
+    'django.contrib.sites',
     'django.contrib.staticfiles',
     'django.contrib.postgres',
-    
+
     # Applications tierces
     'rest_framework',
     'corsheaders',
@@ -58,26 +59,32 @@ INSTALLED_APPS = [
     'celery',
     'social_django',
     'storages',
-    
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.google',
+
+
     # Applications locales
     'users.apps.UsersConfig',
     'social.apps.SocialConfig',
     'messaging.apps.MessagingConfig',
     'notifications.apps.NotificationsConfig',
-    
+
 
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',  # Pour les fichiers statiques
-    'django.contrib.sessions.middleware.SessionMiddleware',  # DOIT être présent
-    'corsheaders.middleware.CorsMiddleware',  # Si vous utilisez CORS
+    'whitenoise.middleware.WhiteNoiseMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',  # Nécessaire pour l'admin
-    'django.contrib.messages.middleware.MessageMiddleware',  # Nécessaire pour l'admin
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'allauth.account.middleware.AccountMiddleware',
 ]
 
 ROOT_URLCONF = 'yoursocial.urls'
@@ -171,29 +178,122 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Custom user model
 AUTH_USER_MODEL = 'users.User'
 
+# Allauth settings
+AUTHENTICATION_BACKENDS = (
+    'django.contrib.auth.backends.ModelBackend',
+    'allauth.account.auth_backends.AuthenticationBackend',
+)
+
+SITE_ID = 2
+ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_EMAIL_VERIFICATION = 'mandatory'
+ACCOUNT_AUTHENTICATION_METHOD = 'username_email'
+
+
 # REST Framework settings
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': [
+    'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-    ],
-    'DEFAULT_PERMISSION_CLASSES': [
+    ),
+    'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
-    ],
+    ),
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
-    'DEFAULT_FILTER_BACKENDS': [
+    'DEFAULT_FILTER_BACKENDS': (
         'django_filters.rest_framework.DjangoFilterBackend',
         'rest_framework.filters.SearchFilter',
         'rest_framework.filters.OrderingFilter',
-    ],
+    ),
+    'DEFAULT_RENDERER_CLASSES': (
+        'rest_framework.renderers.JSONRenderer',
+    ),
+    'DEFAULT_PARSER_CLASSES': (
+        'rest_framework.parsers.JSONParser',
+        'rest_framework.parsers.MultiPartParser',
+        'rest_framework.parsers.FormParser',
+    ),
+    'DEFAULT_THROTTLE_CLASSES': (
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ),
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '100/hour',
+        'user': '1000/hour',
+    },
+    'DEFAULT_VERSIONING_CLASS': 'rest_framework.versioning.NamespaceVersioning',
+    'DEFAULT_VERSION': 'v1',
+    'ALLOWED_VERSIONS': ('v1',),
+    'DEFAULT_VERSION_PARAM': 'version',
+}
+
+# JWT settings
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=int(os.getenv('JWT_ACCESS_TOKEN_LIFETIME', 60))),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=int(os.getenv('JWT_REFRESH_TOKEN_LIFETIME', 7))),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'UPDATE_LAST_LOGIN': True,
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': SECRET_KEY,
+    'VERIFYING_KEY': None,
+    'AUDIENCE': None,
+    'ISSUER': None,
+    'JWK_URL': None,
+    'LEEWAY': 0,
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
+    'USER_AUTHENTICATION_RULE': 'rest_framework_simplejwt.authentication.default_user_authentication_rule',
+    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
+    'TOKEN_TYPE_CLAIM': 'token_type',
+    'TOKEN_USER_CLASS': 'rest_framework_simplejwt.models.TokenUser',
+    'JTI_CLAIM': 'jti',
+    'SLIDING_TOKEN_REFRESH_EXP_CLAIM': 'refresh_exp',
+    'SLIDING_TOKEN_LIFETIME': timedelta(minutes=5),
+    'SLIDING_TOKEN_REFRESH_LIFETIME': timedelta(days=1),
 }
 
 # CORS settings
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "https://yoursocial.com",
+    "https://www.yoursocial.com",
+    "https://9000-firebase-yoursocialapi-1763984561280.cluster-lu4mup47g5gm4rtyvhzpwbfadi.cloudworkstations.dev",
+    "https://9002-firebase-yoursocialapi-1763984561280.cluster-lu4mup47g5gm4rtyvhzpwbfadi.cloudworkstations.dev",
 ]
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_METHODS = (
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+)
+CORS_ALLOW_HEADERS = (
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+)
+
+
+# Configuration des cookies CSRF
+CSRF_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_TRUSTED_ORIGINS = [
+    "https://9000-firebase-yoursocialapi-1763984561280.cluster-lu4mup47g5gm4rtyvhzpwbfadi.cloudworkstations.dev",
+    "https://9002-firebase-yoursocialapi-1763984561280.cluster-lu4mup47g5gm4rtyvhzpwbfadi.cloudworkstations.dev"
+]
 
 # Email settings
 EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
@@ -202,14 +302,7 @@ EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
 EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True') == 'True'
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
-
-# JWT settings
-SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=int(os.getenv('JWT_ACCESS_TOKEN_LIFETIME', 60))),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=int(os.getenv('JWT_REFRESH_TOKEN_LIFETIME', 7))),
-    'ROTATE_REFRESH_TOKENS': True,
-    'BLACKLIST_AFTER_ROTATION': True,
-}
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@yoursocial.com')
 
 # Cache settings
 CACHES = {
@@ -226,6 +319,14 @@ CACHES = {
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
 
+
+# Static files (CSS, JavaScript, Images)
+# https://docs.djangoproject.com/en/5.2/howto/static-files/
+
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+
 # Security settings
 if not DEBUG:
     SECURE_SSL_REDIRECT = True
@@ -237,31 +338,13 @@ if not DEBUG:
     SECURE_HSTS_SECONDS = 31536000  # 1 year
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
+    SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
 
 # Configuration de l'API
 API_TITLE = "YourSocial API"
 API_DESCRIPTION = "API pour le réseau social YourSocial"
 API_VERSION = "1.0.0"
 API_DOCS_URL = "/api/docs"
-
-# # Configuration pour les tests
-# if 'test' in sys.argv:
-#     DATABASES = {
-#         'default': {
-#             'ENGINE': 'django.db.backends.sqlite3',
-#             'NAME': ':memory:',
-#         }
-#     }
-    
-#     # Désactiver les migrations pour les tests
-#     class DisableMigrations:
-#         def __contains__(self, item):
-#             return True
-        
-#         def __getitem__(self, item):
-#             return None
-    
-#     MIGRATION_MODULES = DisableMigrations()
 
 # Configuration pour le développement
 if DEBUG:
@@ -289,10 +372,14 @@ if DEBUG:
             },
         },
     }
-    
+
     # Configuration CORS pour le développement
     CORS_ALLOW_ALL_ORIGINS = True
     CORS_ALLOW_CREDENTIALS = True
+
+    # Django Debug Toolbar
+    INTERNAL_IPS = ['127.0.0.1', 'localhost']
+    MIDDLEWARE += ['debug_toolbar.middleware.DebugToolbarMiddleware']
 
 # Configuration pour la production
 if not DEBUG:
@@ -324,135 +411,13 @@ if not DEBUG:
         },
     }
 
-# Configuration des médias
-MEDIA_URL = os.getenv('MEDIA_URL', '/media/')
-MEDIA_ROOT = os.path.join(BASE_DIR, os.getenv('MEDIA_ROOT', 'media'))
-
-
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.2/howto/static-files/
-
-
-# Configuration des fichiers statiques
-# STATIC_URL = os.getenv('STATIC_URL', '/static/')
-# STATIC_ROOT = os.path.join(BASE_DIR, os.getenv('STATIC_ROOT', 'static'))
-
-STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-
-# En production sur Render
-
-# Configuration des sessions
-SESSION_COOKIE_AGE = 60 * 60 * 24 * 7  # 7 jours
-SESSION_COOKIE_SECURE = not DEBUG
-SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SAMESITE = 'Lax'
-
-# Configuration des cookies CSRF
-CSRF_COOKIE_SECURE = not DEBUG
-CSRF_COOKIE_HTTPONLY = True
-CSRF_COOKIE_SAMESITE = 'Lax'
-
-# Configuration des messages
-MESSAGE_STORAGE = 'django.contrib.messages.storage.session.SessionStorage'
-
-# Configuration des langues
-LANGUAGES = [
-    ('fr', 'Français'),
-    ('en', 'English'),
-    ('es', 'Español'),
-]
-
-LOCALE_PATHS = [
-    os.path.join(BASE_DIR, 'locale'),
-]
-
-# Configuration des fuseaux horaires
-USE_TZ = True
-TIME_ZONE = 'Europe/Paris'
-
-# Configuration des formats de date
-DATE_FORMAT = 'd/m/Y'
-DATETIME_FORMAT = 'd/m/Y H:i'
-SHORT_DATE_FORMAT = 'd/m/Y'
-SHORT_DATETIME_FORMAT = 'd/m/Y H:i'
-
-# Configuration des nombres
-DECIMAL_SEPARATOR = ','
-THOUSAND_SEPARATOR = ' '
-NUMBER_GROUPING = 3
-
-# Configuration des fichiers uploadés
-FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
-DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
-FILE_UPLOAD_TEMP_DIR = os.path.join(BASE_DIR, 'temp')
-
-# Créez un répertoire temporaire pour Render
-if 'RENDER' in os.environ:
-    BASE_DIR = Path(__file__).resolve().parent.parent
-    TEMP_DIR = BASE_DIR / 'temp'
-    TEMP_DIR.mkdir(exist_ok=True)
-    FILE_UPLOAD_TEMP_DIR = TEMP_DIR
-    FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
-
-
-# Configuration des types de fichiers autorisés
-ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
-ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/ogg']
-ALLOWED_AUDIO_TYPES = ['audio/mpeg', 'audio/wav', 'audio/ogg']
-
-# Configuration des tailles de fichiers
-MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5MB
-MAX_VIDEO_SIZE = 50 * 1024 * 1024  # 50MB
-MAX_AUDIO_SIZE = 10 * 1024 * 1024  # 10MB
-
-# Configuration des dimensions d'images
-AVATAR_SIZE = (200, 200)
-BANNER_SIZE = (1200, 400)
-POST_IMAGE_SIZE = (1080, 1080)
-STORY_SIZE = (1080, 1920)
-
-# Configuration des notifications
-NOTIFICATION_TYPES = [
-    'follow',
-    'like',
-    'comment',
-    'mention',
-    'message',
-    'story_view',
-]
-
-# Configuration des hashtags
-MAX_HASHTAGS_PER_POST = 30
-MAX_HASHTAG_LENGTH = 50
-
-# Configuration des mentions
-MAX_MENTIONS_PER_POST = 20
-
-# Configuration des stories
-STORY_DURATION_HOURS = 24
-
-# Configuration de la pagination
-DEFAULT_PAGE_SIZE = 20
-MAX_PAGE_SIZE = 100
-
-# Configuration du rate limiting
-RATE_LIMIT_REQUESTS = 100  # Requêtes par minute
-RATE_LIMIT_WINDOW = 60  # Secondes
-
-# Configuration des caches
-CACHE_TIMEOUT = 300  # 5 minutes
-CACHE_KEY_PREFIX = 'yoursocial'
-
-# Configuration des tâches asynchrones
+# Celery settings
 CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/1')
 CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://localhost:6379/2')
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
-
-# Configuration des tâches périodiques
 CELERY_BEAT_SCHEDULE = {
     'cleanup-expired-stories': {
         'task': 'social.tasks.cleanup_expired_stories',
@@ -467,267 +432,3 @@ CELERY_BEAT_SCHEDULE = {
         'schedule': 3600.0,  # Toutes les heures
     },
 }
-
-# Configuration des webhooks
-WEBHOOK_SECRET = os.getenv('WEBHOOK_SECRET', 'your-webhook-secret')
-WEBHOOK_TIMEOUT = 30  # Secondes
-
-# Configuration des API externes
-SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = os.getenv('GOOGLE_OAUTH2_KEY', '')
-SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = os.getenv('GOOGLE_OAUTH2_SECRET', '')
-
-SOCIAL_AUTH_FACEBOOK_KEY = os.getenv('FACEBOOK_APP_ID', '')
-SOCIAL_AUTH_FACEBOOK_SECRET = os.getenv('FACEBOOK_APP_SECRET', '')
-
-# Configuration des services tiers
-AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID', '')
-AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY', '')
-AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME', '')
-AWS_S3_REGION_NAME = os.getenv('AWS_S3_REGION_NAME', 'us-east-1')
-AWS_S3_FILE_OVERWRITE = False
-AWS_DEFAULT_ACL = None
-AWS_S3_VERIFY = True
-
-# Configuration de Stripe (pour les fonctionnalités premium)
-STRIPE_PUBLISHABLE_KEY = os.getenv('STRIPE_PUBLISHABLE_KEY', '')
-STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY', '')
-STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET', '')
-
-# Configuration de SendGrid (pour les emails)
-SENDGRID_API_KEY = os.getenv('SENDGRID_API_KEY', '')
-SENDGRID_FROM_EMAIL = os.getenv('SENDGRID_FROM_EMAIL', 'noreply@yoursocial.com')
-
-# Configuration de Firebase (pour les notifications push)
-FIREBASE_CREDENTIALS = os.getenv('FIREBASE_CREDENTIALS', '')
-FIREBASE_PROJECT_ID = os.getenv('FIREBASE_PROJECT_ID', '')
-
-# Configuration de l'analyse
-GOOGLE_ANALYTICS_ID = os.getenv('GOOGLE_ANALYTICS_ID', '')
-MIXPANEL_TOKEN = os.getenv('MIXPANEL_TOKEN', '')
-
-# Configuration de la sécurité
-SECURE_BROWSER_XSS_FILTER = True
-SECURE_CONTENT_TYPE_NOSNIFF = True
-X_FRAME_OPTIONS = 'DENY'
-SECURE_HSTS_SECONDS = 31536000  # 1 an
-SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-SECURE_HSTS_PRELOAD = True
-
-# Configuration des en-têtes de sécurité
-SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
-
-# Configuration des cookies de session
-SESSION_COOKIE_AGE = 60 * 60 * 24 * 7  # 7 jours
-SESSION_EXPIRE_AT_BROWSER_CLOSE = False
-SESSION_SAVE_EVERY_REQUEST = True
-
-# Configuration des mots de passe
-PASSWORD_HASHERS = [
-
-    'django.contrib.auth.hashers.Argon2PasswordHasher',
-    'django.contrib.auth.hashers.PBKDF2PasswordHasher',
-    'django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher',
-]
-
-# Configuration des validations de mots de passe
-AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-        'OPTIONS': {
-            'min_length': 8,
-        }
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
-]
-
-# Configuration de Django Debug Toolbar
-if DEBUG:
-    INTERNAL_IPS = [
-        '127.0.0.1',
-        'localhost',
-    ]
-    
-    MIDDLEWARE += [
-        'debug_toolbar.middleware.DebugToolbarMiddleware',
-    ]
-
-# Configuration de Django Extensions
-SHELL_PLUS = "ipython"
-SHELL_PLUS_PRINT_SQL = True
-SHELL_PLUS_PRINT_SQL_TRUNCATE = 1000
-
-# Configuration des tests
-TEST_RUNNER = 'django.test.runner.DiscoverRunner'
-TEST_DISCOVER_TOP_LEVEL = BASE_DIR
-TEST_DISCOVER_ROOT = BASE_DIR
-TEST_DISCOVER_PATTERN = "test_*.py"
-
-# Configuration de la couverture de code
-COVERAGE_REPORT_HTML_OUTPUT_DIR = os.path.join(BASE_DIR, 'htmlcov')
-COVERAGE_REPORT_TERMINAL_OUTPUT = True
-COVERAGE_REPORT_SHOW_MISSING = True
-COVERAGE_REPORT_EXCLUDE_LINES = [
-    'pragma: no cover',
-    'def __repr__',
-    'if self.debug:',
-    'if settings.DEBUG',
-    'raise AssertionError',
-    'raise NotImplementedError',
-    'if 0:',
-    'if __name__ == .__main__.:',
-    'class .*\bProtocol\):',
-    '@(abc\.)?abstractmethod',
-]
-
-# Configuration des migrations
-MIGRATION_MODULES = {
-    'users': 'users.migrations',
-    'social': 'social.migrations',
-    'messaging': 'messaging.migrations',
-    'notifications': 'notifications.migrations',
-}
-
-# Configuration des modèles
-AUTH_USER_MODEL = 'users.User'
-
-# Configuration des permissions
-REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-    ],
-    'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
-    ],
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 20,
-    'DEFAULT_FILTER_BACKENDS': [
-        'django_filters.rest_framework.DjangoFilterBackend',
-        'rest_framework.filters.SearchFilter',
-        'rest_framework.filters.OrderingFilter',
-    ],
-    'DEFAULT_RENDERER_CLASSES': [
-        'rest_framework.renderers.JSONRenderer',
-    ],
-    'DEFAULT_PARSER_CLASSES': [
-        'rest_framework.parsers.JSONParser',
-        'rest_framework.parsers.MultiPartParser',
-        'rest_framework.parsers.FormParser',
-    ],
-    'DEFAULT_THROTTLE_CLASSES': [
-        'rest_framework.throttling.AnonRateThrottle',
-        'rest_framework.throttling.UserRateThrottle',
-    ],
-    'DEFAULT_THROTTLE_RATES': {
-        'anon': '100/hour',
-        'user': '1000/hour',
-    },
-    'DEFAULT_VERSIONING_CLASS': 'rest_framework.versioning.NamespaceVersioning',
-    'DEFAULT_VERSION': 'v1',
-    'ALLOWED_VERSIONS': ['v1'],
-    'DEFAULT_VERSION_PARAM': 'version',
-}
-
-# Configuration JWT
-SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=int(os.getenv('JWT_ACCESS_TOKEN_LIFETIME', 60))),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=int(os.getenv('JWT_REFRESH_TOKEN_LIFETIME', 7))),
-    'ROTATE_REFRESH_TOKENS': True,
-    'BLACKLIST_AFTER_ROTATION': True,
-    'UPDATE_LAST_LOGIN': True,
-    'ALGORITHM': 'HS256',
-    'SIGNING_KEY': SECRET_KEY,
-    'VERIFYING_KEY': None,
-    'AUDIENCE': None,
-    'ISSUER': None,
-    'JWK_URL': None,
-    'LEEWAY': 0,
-    'AUTH_HEADER_TYPES': ('Bearer',),
-    'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
-    'USER_ID_FIELD': 'id',
-    'USER_ID_CLAIM': 'user_id',
-    'USER_AUTHENTICATION_RULE': 'rest_framework_simplejwt.authentication.default_user_authentication_rule',
-    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
-    'TOKEN_TYPE_CLAIM': 'token_type',
-    'TOKEN_USER_CLASS': 'rest_framework_simplejwt.models.TokenUser',
-    'JTI_CLAIM': 'jti',
-    'SLIDING_TOKEN_REFRESH_EXP_CLAIM': 'refresh_exp',
-    'SLIDING_TOKEN_LIFETIME': timedelta(minutes=5),
-    'SLIDING_TOKEN_REFRESH_LIFETIME': timedelta(days=1),
-}
-
-# Configuration CORS
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "https://yoursocial.com",
-    "https://www.yoursocial.com",
-    
-]
-CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_METHODS = [
-    'DELETE',
-    'GET',
-    'OPTIONS',
-    'PATCH',
-    'POST',
-    'PUT',
-]
-CORS_ALLOW_HEADERS = [
-    'accept',
-    'accept-encoding',
-    'authorization',
-    'content-type',
-    'dnt',
-    'origin',
-    'user-agent',
-    'x-csrftoken',
-    'x-requested-with',
-]
-
-# Configuration des emails
-EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
-EMAIL_HOST = os.getenv('EMAIL_HOST', '')
-EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
-EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True') == 'True'
-EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
-EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@yoursocial.com')
-
-# Configuration du cache
-CACHES = {
-    'default': {
-        'BACKEND': 'django_redis.cache.RedisCache',
-        'LOCATION': f"redis://{os.getenv('REDIS_HOST', 'localhost')}:{os.getenv('REDIS_PORT', 6379)}/{os.getenv('REDIS_DB', 0)}",
-        'OPTIONS': {
-            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-        }
-    }
-}
-
-
-
-# Configuration de la sécurité
-if not DEBUG:
-    SECURE_SSL_REDIRECT = True
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
-    SECURE_BROWSER_XSS_FILTER = True
-    SECURE_CONTENT_TYPE_NOSNIFF = True
-    X_FRAME_OPTIONS = 'DENY'
-    SECURE_HSTS_SECONDS = 31536000  # 1 year
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = True
-
-# Configuration de l'API
-API_TITLE = "YourSocial API"
-API_DESCRIPTION = "API pour le réseau social YourSocial"
-API_VERSION = "1.0.0"
-API_DOCS_URL = "/api/docs"
