@@ -177,7 +177,7 @@ python ma    ma
 
 ## **Priorités Recommandées**
 
-Pour commencer, je recommande de prioriser :
+Prioriser :
 
 1. **🔐 Sécurité** : 2FA, rate limiting, permissions
 2. **📱 Messagerie** : Chat en temps réel
